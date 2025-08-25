@@ -10,7 +10,7 @@ function App() {
   const [currentStep, setCurrentStep] = useState<'input' | 'imageUpload' | 'sorting' | 'tierSetting' | 'locked'>('input');
   const [input, setInput] = useState('');
   const [items, setItems] = useState<string[]>([]);
-  const [itemImages, setItemImages] = useState<{ [key: string]: string }>({}); // Map items to image URLs
+  const [itemImages, setItemImages] = useState<{ [key: string]: string }>({}); // Map items to temporary image URLs
   const [tree, setTree] = useState<Tree | null>(null);
   const [randomized, setRandomized] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -26,7 +26,7 @@ function App() {
   const handleImageUpload = (item: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const imageUrl = URL.createObjectURL(file);
+      const imageUrl = URL.createObjectURL(file); // Temporary URL for local file
       setItemImages((prev) => ({ ...prev, [item]: imageUrl }));
     }
   };
@@ -210,6 +210,9 @@ function App() {
         {currentStep === 'imageUpload' && items.length > 0 && (
           <div>
             <h2 style={{ color: '#D3D3D3' }}>Upload Images</h2>
+            <p style={{ color: '#D3D3D3', marginBottom: '10px' }}>
+              Select a local image file for each item. The preview will be shown during this session only.
+            </p>
             {items.map((item, idx) => (
               <div key={idx} style={{ marginBottom: '10px', display: 'flex', alignItems: 'center' }}>
                 <span style={{ marginRight: '10px' }}>{item}</span>
