@@ -345,7 +345,6 @@ function App() {
         )}
         {currentStep === 'locked' && (
           <div>
-            <h2 style={{ color: '#D3D3D3' }}>Final Tier List Table</h2>
             <table border={1} style={{ borderCollapse: 'collapse', marginTop: '20px' }}>
               <tbody>
                 {getTiers().map((tier, tierIdx) => (
