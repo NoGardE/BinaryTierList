@@ -2,15 +2,20 @@ import React, { useState, useRef } from 'react';
 import { Tree, Node } from './Tree';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
-import { CSSProperties } from 'react'; // Import CSSProperties for typing
+import { CSSProperties } from 'react';
 
 const BoundaryType = 'boundary';
+
+interface TierListData {
+  items: string[];
+  images: { [key: string]: string }; // Base64-encoded images
+}
 
 function App() {
   const [currentStep, setCurrentStep] = useState<'input' | 'imageUpload' | 'sorting' | 'tierSetting' | 'locked'>('input');
   const [input, setInput] = useState('');
   const [items, setItems] = useState<string[]>([]);
-  const [itemImages, setItemImages] = useState<{ [key: string]: string }>({}); // Map items to temporary image URLs
+  const [itemImages, setItemImages] = useState<{ [key: string]: string }>({}); // Map items to temporary image URLs or base64
   const [tree, setTree] = useState<Tree | null>(null);
   const [randomized, setRandomized] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -26,14 +31,61 @@ function App() {
   const handleImageUpload = (item: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const imageUrl = URL.createObjectURL(file); // Temporary URL for local file
-      setItemImages((prev) => ({ ...prev, [item]: imageUrl }));
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = reader.result as string; // Base64 string
+        setItemImages((prev) => ({ ...prev, [item]: base64 }));
+      };
+      reader.readAsDataURL(file); // Read image as base64
     }
+  };
+
+  const handleRemoveImage = (item: string) => {
+    setItemImages((prev) => {
+      const newImages = { ...prev };
+      delete newImages[item]; // Remove the image for the specified item
+      return newImages;
+    });
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const data = JSON.parse(event.target?.result as string) as TierListData;
+          setInput(data.items.join('\n'));
+          setItems(data.items);
+          setItemImages(data.images);
+          setCurrentStep('imageUpload'); // Always go to imageUpload step
+        } catch (error) {
+          console.error('Error parsing file:', error);
+          alert('Invalid file format. Please upload a valid tier list file.');
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  const handleDownload = () => {
+    const data: TierListData = {
+      items,
+      images: itemImages,
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'tierlist.json';
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleSubmit = () => {
     const list = input.split('\n').map(s => s.trim()).filter(s => s);
     setItems(list);
+    setItemImages({}); // Reset images on new submit
     setCurrentStep('imageUpload');
   };
 
@@ -74,14 +126,13 @@ function App() {
         setCurrentItem(null);
         setCurrentNode(null);
         setSorted(newTree.getSorted());
-        setCurrentStep('tierSetting'); // Transition to tier-setting after sorting
+        setCurrentStep('tierSetting');
       }
     }
   };
 
   const toggleBoundary = (index: number) => {
     if (boundaries.includes(index)) {
-      // Remove boundary and allow Gap to reappear
       removeBoundary(index);
     } else if (boundaries.length < 7) {
       addBoundary(index);
@@ -101,7 +152,6 @@ function App() {
   const removeBoundary = (index: number) => {
     const newBoundaries = boundaries.filter((b) => b !== index);
     setBoundaries(newBoundaries);
-    // Adjust tierNames to remove the corresponding name if it exists
     setTierNames(tierNames.filter((_, i) => i < boundaries.length - 1 || boundaries.includes(index - 1)));
   };
 
@@ -150,7 +200,7 @@ function App() {
     });
 
     const ref = useRef<HTMLDivElement>(null);
-    drop(ref); // Connect the drop target to the ref
+    drop(ref);
 
     const style: CSSProperties = {
       height: '5px',
@@ -175,7 +225,7 @@ function App() {
     });
 
     const ref = useRef<HTMLDivElement>(null);
-    drag(ref); // Connect the drag source to the ref
+    drag(ref);
 
     const style: CSSProperties = {
       height: '5px',
@@ -204,14 +254,25 @@ function App() {
               style={{ color: '#D3D3D3', backgroundColor: '#3C3F41' }}
             />
             <br />
-            <button onClick={handleSubmit} style={{ color: '#D3D3D3', backgroundColor: '#3C3F41' }}>Submit List</button>
+            <input
+              type="file"
+              accept=".json"
+              onChange={handleFileUpload}
+              style={{ color: '#D3D3D3', backgroundColor: '#3C3F41', marginRight: '10px' }}
+            />
+            <button onClick={handleDownload} style={{ color: '#D3D3D3', backgroundColor: '#3C3F41', marginRight: '10px' }}>
+              Download List
+            </button>
+            <button onClick={handleSubmit} style={{ color: '#D3D3D3', backgroundColor: '#3C3F41' }}>
+              Submit List
+            </button>
           </div>
         )}
         {currentStep === 'imageUpload' && items.length > 0 && (
           <div>
             <h2 style={{ color: '#D3D3D3' }}>Upload Images</h2>
             <p style={{ color: '#D3D3D3', marginBottom: '10px' }}>
-              Select a local image file for each item. The preview will be shown during this session only.
+              Select a local image file for each item or load a saved tier list. Images are stored for this session or in saved files.
             </p>
             {items.map((item, idx) => (
               <div key={idx} style={{ marginBottom: '10px', display: 'flex', alignItems: 'center' }}>
@@ -223,12 +284,35 @@ function App() {
                   style={{ color: '#D3D3D3', backgroundColor: '#3C3F41', marginRight: '10px' }}
                 />
                 {itemImages[item] && (
-                  <img src={itemImages[item]} alt={`${item} preview`} style={{ width: '50px', height: '50px', objectFit: 'cover', marginLeft: '10px' }} />
+                  <>
+                    <img
+                      src={itemImages[item]}
+                      alt={`${item} preview`}
+                      style={{ width: '50px', height: '50px', objectFit: 'cover', marginLeft: '10px', marginRight: '10px' }}
+                    />
+                    <button
+                      onClick={() => handleRemoveImage(item)}
+                      style={{ color: '#D3D3D3', backgroundColor: '#3C3F41' }}
+                    >
+                      Remove Image
+                    </button>
+                  </>
                 )}
               </div>
             ))}
             <br />
-            <button onClick={handleStartSorting} style={{ color: '#D3D3D3', backgroundColor: '#3C3F41' }}>Start Sorting</button>
+            <input
+              type="file"
+              accept=".json"
+              onChange={handleFileUpload}
+              style={{ color: '#D3D3D3', backgroundColor: '#3C3F41', marginRight: '10px' }}
+            />
+            <button onClick={handleDownload} style={{ color: '#D3D3D3', backgroundColor: '#3C3F41', marginRight: '10px' }}>
+              Save Tier List
+            </button>
+            <button onClick={handleStartSorting} style={{ color: '#D3D3D3', backgroundColor: '#3C3F41' }}>
+              Start Sorting
+            </button>
           </div>
         )}
         {currentStep === 'sorting' && currentNode && currentItem && (
