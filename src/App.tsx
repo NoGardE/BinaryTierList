@@ -11,6 +11,8 @@ function App() {
   const [currentItem, setCurrentItem] = useState<string | null>(null);
   const [currentNode, setCurrentNode] = useState<Node | null>(null);
   const [sorted, setSorted] = useState<string[] | null>(null);
+  const [boundaries, setBoundaries] = useState<number[]>([]);
+  const [tierNames, setTierNames] = useState<string[]>([]);
 
   const handleSubmit = () => {
     const list = input.split('\n').map(s => s.trim()).filter(s => s);
@@ -75,6 +77,36 @@ function App() {
     return checkNode(tree.root);
   };
 
+  const addBoundary = (index: number) => {
+    const newBoundaries = [...boundaries, index].sort((a, b) => a - b);
+    setBoundaries(newBoundaries);
+    setTierNames([...tierNames, '']);
+  };
+
+  const removeBoundary = (index: number) => {
+    const newBoundaries = boundaries.filter((b) => b !== index);
+    setBoundaries(newBoundaries);
+    setTierNames(tierNames.filter((_, i) => boundaries[i] !== index));
+  };
+
+  const updateTierName = (index: number, name: string) => {
+    const newTierNames = [...tierNames];
+    newTierNames[index] = name;
+    setTierNames(newTierNames);
+  };
+
+  const getTiers = () => {
+    if (!sorted) return [];
+    const tiers: { name: string; items: string[] }[] = [];
+    let start = 0;
+    boundaries.forEach((boundary, idx) => {
+      tiers.push({ name: tierNames[idx], items: sorted.slice(start, boundary) });
+      start = boundary;
+    });
+    tiers.push({ name: tierNames[tierNames.length - 1], items: sorted.slice(start) });
+    return tiers;
+  };
+
   return (
     <div style={{ padding: '20px' }}>
       {!items.length ? (
@@ -102,13 +134,41 @@ function App() {
           <h3>Current Tree:</h3>
           <pre>{tree.getTreeString() || 'Empty'}</pre>
         </div>
-      ) : null}
-      {sorted ? (
+      ) : null}{sorted ? (
         <div>
           <h2>Sorted List:</h2>
           <ul>
-            {sorted.map((item, idx) => <li key={idx}>{item}</li>)}
+            {sorted.map((item, idx) => (
+              <li key={idx}>{item}</li>
+            ))}
           </ul>
+          <h2>Create Tier List</h2>
+          <ul>
+            {sorted.map((item, idx) => (
+              <React.Fragment key={idx}>
+                <li>{item}</li>
+                {idx < sorted.length - 1 && (
+                  <button onClick={() => addBoundary(idx + 1)}>Add Boundary Here</button>
+                )}
+              </React.Fragment>
+            ))}
+          </ul>
+          <h3>Tier List</h3>
+          {getTiers().map((tier, idx) => (
+            <div key={idx}>
+              <input
+                type="text"
+                placeholder="Tier Name"
+                value={tierNames[idx] || ''}
+                onChange={(e) => updateTierName(idx, e.target.value)}
+              />
+              <ul>
+                {tier.items.map((item, i) => (
+                  <li key={i}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
       ) : null}
     </div>
