@@ -37,7 +37,6 @@ function App() {
   const [itemImages, setItemImages] = useState<{ [key: string]: string }>({}); // Map items to base64-encoded images
   const [tree, setTree] = useState<Tree | null>(null);
   const [randomized, setRandomized] = useState<string[]>([]); // Persist randomized items in state
-  const [currentIndex, setCurrentIndex] = useState(0);
   const [currentItem, setCurrentItem] = useState<string | null>(null);
   const [currentNode, setCurrentNode] = useState<Node | null>(null);
   const [sorted, setSorted] = useState<string[] | null>(null);
@@ -236,7 +235,6 @@ function App() {
     const updatedRandomized = shuffled.slice(1);
     setTree(newTree);
     setRandomized(updatedRandomized);
-    setCurrentIndex(0);
     if (updatedRandomized.length > 0) {
       setCurrentItem(updatedRandomized[0]);
       setCurrentNode(newTree.root);
@@ -254,7 +252,6 @@ function App() {
     console.log('Restarting with same config');
     setTree(null);
     setRandomized([]);
-    setCurrentIndex(0);
     setCurrentItem(null);
     setCurrentNode(null);
     setSorted(null);
@@ -271,7 +268,6 @@ function App() {
     setItemImages({});
     setTree(null);
     setRandomized([]);
-    setCurrentIndex(0);
     setCurrentItem(null);
     setCurrentNode(null);
     setSorted(null);
@@ -286,51 +282,13 @@ function App() {
       console.error('Invalid state in handleComparison:', { currentNode, currentItem, tree, randomized });
       return;
     }
-    console.log(`Comparing: ${currentNode.value} vs ${currentItem}, Choosing ${better}, Current Index: ${currentIndex}, Randomized: ${randomized.length}`);
-
-    // Prevent self-comparison
-    if (currentItem === currentNode.value) {
-      console.log(`Self-comparison detected for ${currentItem}. Skipping to next item or ending.`);
-      const updatedRandomized = [...randomized];
-      updatedRandomized.splice(currentIndex, 1); // Remove the current item
-      setRandomized(updatedRandomized);
-      if (updatedRandomized.length > 0) {
-        setCurrentItem(updatedRandomized[0]);
-        setCurrentIndex(0);
-        setCurrentNode(tree.root);
-      } else {
-        console.log('All items compared, getting sorted list');
-        setCurrentItem(null);
-        setCurrentNode(null);
-        const sortedList = tree.getSorted();
-        console.log('Sorted list:', sortedList);
-        setSorted(sortedList);
-        setCurrentStep('tierSetting');
-      }
-      return;
-    }
-
+    console.log(`Comparing: ${currentNode.value} vs ${currentItem}, Choosing ${better}, Randomized: ${randomized.length}`);
     const direction = better === currentNode.value ? 'right' : 'left';
     const child = currentNode[direction];
+
     if (child) {
       console.log(`Child exists, moving to ${direction} child: ${child.value}`);
       setCurrentNode(child);
-      // Move to the next item in randomized, if available
-      if (randomized.length > currentIndex + 1) {
-        setCurrentItem(randomized[currentIndex + 1]);
-        setCurrentIndex(currentIndex + 1); // Increment currentIndex
-      } else if (randomized.length > 0) {
-        setCurrentItem(randomized[0]);
-        setCurrentIndex(0); // Reset to start of randomized
-      } else {
-        console.log('All items compared, getting sorted list');
-        setCurrentItem(null);
-        setCurrentNode(null);
-        const sortedList = tree.getSorted();
-        console.log('Sorted list:', sortedList);
-        setSorted(sortedList);
-        setCurrentStep('tierSetting');
-      }
     } else {
       console.log(`Adding ${currentItem} as ${direction} child of ${currentNode.value}`);
       currentNode.addChild(currentItem, direction);
@@ -340,13 +298,12 @@ function App() {
       setTree(newTree);
       // Remove the current item from randomized
       const updatedRandomized = [...randomized];
-      updatedRandomized.splice(currentIndex, 1);
+      updatedRandomized.shift();
       setRandomized(updatedRandomized);
       console.log(`Updated randomized: ${updatedRandomized.length} items remaining`, updatedRandomized);
       if (updatedRandomized.length > 0) {
-        setCurrentItem(updatedRandomized[0]);
+        setCurrentItem(updatedRandomized[0]); // Start with the first remaining item
         setCurrentNode(newTree.root);
-        setCurrentIndex(0); // Reset index for the next iteration
       } else {
         console.log('All items compared, getting sorted list');
         setCurrentItem(null);
@@ -443,7 +400,6 @@ function App() {
       zIndex: 10,
     };
 
-    console.log(`Rendering Gap at index ${index}, isOver: ${isOver}, canDrop: ${canDrop}`);
     return <div ref={ref} style={style} onClick={() => toggleBoundary(index)} />;
   };
 
@@ -469,7 +425,6 @@ function App() {
       zIndex: 10,
     };
 
-    console.log(`Rendering Boundary at index ${index}, isDragging: ${isDragging}`);
     return <div ref={ref} style={style} onClick={() => toggleBoundary(index)} />;
   };
 
@@ -857,7 +812,7 @@ function App() {
                   maxWidth: '600px',
                 }}
               >
-                Restart with Same Config
+                Try Again
               </button>
               <button
                 className="locked-button"
